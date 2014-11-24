@@ -57,10 +57,17 @@
 
 //#define WEATHER_SERVER  "openweathermap.org"
 #define WEATHER_SERVER  "capstone_ara.ngrok.com"
+#define DEVICE_ID		"9000"
 
 #define PREFIX_BUFFER   "GET /getcommand/134"
 #define POST_BUFFER     " HTTP/1.1\r\nHost:capstone_ara.ngrok.com\r\nAccept: */"
 #define POST_BUFFER2    "*\r\n\r\n"
+
+#define GET_BUFFER		"GET /getcommand/"
+#define TASK_PRE_BUFFER	"GET /completetask/device="
+#define TASK_POST_BUFFER	"&task="
+#define SEND_PRE_BUFFER 	"/sendtemp/device="
+#define SEND_POST_BUFFER	"&temp="
 
 #define SMALL_BUF           32
 #define MAX_SEND_BUF_SIZE   512
@@ -76,6 +83,13 @@ typedef enum{
     STATUS_CODE_MAX = -0xBB8
 }e_AppStatusCodes;
 
+//enum with possible cases for making network communication
+typedef enum{
+	GETCMD,
+	MARKCOMPLETE,
+	SEND
+} tx_enum;
+
 /*
  * GLOBAL VARIABLES -- Start
  */
@@ -89,6 +103,8 @@ struct{
 
     _u32 DestinationIP;
     _i16 SockID;
+    //hold the device ID string
+    _u8 DeviceID[SMALL_BUF];
 }g_AppData;
 /*
  * GLOBAL VARIABLES -- End
@@ -109,6 +125,8 @@ static _i32 getWeather();
 static _i32 getHostIP();
 static _i32 createConnection();
 static _i32 getData();
+
+static _i32 sendMessage(tx_enum type, char* data);
 /*
  * STATIC FUNCTION DEFINITIONS -- End
  */
@@ -426,25 +444,32 @@ static _i32 getData()
     _u8* p_bufLocation = NULL;
     _i32 retVal = -1;
 
+    //first make our buffer just to test
+    sendMessage(GETCMD, "H");
+
+
     pal_Memset(g_AppData.Recvbuff, 0, sizeof(g_AppData.Recvbuff));
 
+
     /* Puts together the HTTP GET string. */
-    p_bufLocation = g_AppData.SendBuff;
-    pal_Strcpy(p_bufLocation, PREFIX_BUFFER);
-
-    p_bufLocation += pal_Strlen(PREFIX_BUFFER);
-//    pal_Strcpy(p_bufLocation, g_AppData.CityName);
-
-//    p_bufLocation += pal_Strlen(g_AppData.CityName);
-    pal_Strcpy(p_bufLocation, POST_BUFFER);
-
-    p_bufLocation += pal_Strlen(POST_BUFFER);
-    pal_Strcpy(p_bufLocation, POST_BUFFER2);
-
-    /* Debugging */
+//    p_bufLocation = g_AppData.SendBuff;
+//    pal_Strcpy(p_bufLocation, PREFIX_BUFFER);
+//
+//    p_bufLocation += pal_Strlen(PREFIX_BUFFER);
+////    pal_Strcpy(p_bufLocation, g_AppData.CityName);
+//
+////    p_bufLocation += pal_Strlen(g_AppData.CityName);
+//    pal_Strcpy(p_bufLocation, POST_BUFFER);
+//
+//    p_bufLocation += pal_Strlen(POST_BUFFER);
+//    pal_Strcpy(p_bufLocation, POST_BUFFER2);
+//
+//    /* Debugging */
     CLI_Write("Send buffer is: ");
     CLI_Write(g_AppData.SendBuff);
-    CLI_Write("\n\r");
+//    CLI_Write("\n\r");
+
+
 
     /* Send the HTTP GET string to the open TCP/IP socket. */
     retVal = sl_Send(g_AppData.SockID, g_AppData.SendBuff, pal_Strlen(g_AppData.SendBuff), 0);
@@ -543,6 +568,38 @@ static _i32 getData()
 
     return SUCCESS;
 }
+
+//Skeleton code for adaptable sending method
+static _i32 sendMessage(tx_enum type, char* data){
+	//switch on which type: GETCMD, MARKCOMPLETE or SEND
+	//what's required to send a message? Must be connected
+	switch(type){
+	case GETCMD:
+		//build the string to make a GET request for a command
+		pal_Strcat(g_AppData.SendBuff, GET_BUFFER);
+		//Add in the device id
+		pal_Strcat(g_AppData.SendBuff, DEVICE_ID);
+		//Add in the post and post2 buffers
+		pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
+		pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
+
+		//test by writing out the string to CLI
+		/* Debugging */
+		CLI_Write("Send buffer is: ");
+		CLI_Write(g_AppData.SendBuff);
+		CLI_Write("\n\r");
+
+		break;
+	case MARKCOMPLETE:
+		//do something
+		break;
+	case SEND:
+		//do something
+		break;
+
+	}
+}
+
 
 /*!
     \brief Create TCP connection with openweathermap.org
@@ -851,6 +908,8 @@ static _i32 initializeAppVariables()
     g_Status = 0;
     pal_Memset(&g_AppData, 0, sizeof(g_AppData));
 
+    /*Austin - Set the device ID to its permanent value*/
+//    g_AppData.DeviceID = 9000;
     return SUCCESS;
 }
 
