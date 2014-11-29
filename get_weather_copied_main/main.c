@@ -48,6 +48,7 @@
 
 #include "simplelink.h"
 #include "sl_common.h"
+#include "convenienceFunctions.h"
 
 #define APPLICATION_VERSION "1.1.0"
 
@@ -105,6 +106,8 @@ struct{
     _i16 SockID;
     //hold the device ID string
     _u8 DeviceID[SMALL_BUF];
+    //The command to be executed
+    _i16 TaskID;
 }g_AppData;
 /*
  * GLOBAL VARIABLES -- End
@@ -445,7 +448,7 @@ static _i32 getData()
     _i32 retVal = -1;
 
     //first make our buffer just to test
-    sendMessage(GETCMD, "H");
+    sendMessage(MARKCOMPLETE, "H");
 
 
     pal_Memset(g_AppData.Recvbuff, 0, sizeof(g_AppData.Recvbuff));
@@ -569,10 +572,12 @@ static _i32 getData()
     return SUCCESS;
 }
 
-//Skeleton code for adaptable sending method
+//Adaptable sending method
 static _i32 sendMessage(tx_enum type, char* data){
+	//All methods use g_AppData.SendBuff, clear it first
+	pal_Memset(g_AppData.SendBuff, 0, sizeof(g_AppData.SendBuff));
+
 	//switch on which type: GETCMD, MARKCOMPLETE or SEND
-	//what's required to send a message? Must be connected
 	switch(type){
 	case GETCMD:
 		//build the string to make a GET request for a command
@@ -582,19 +587,24 @@ static _i32 sendMessage(tx_enum type, char* data){
 		//Add in the post and post2 buffers
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
-
-		//test by writing out the string to CLI
-		/* Debugging */
-		CLI_Write("Send buffer is: ");
-		CLI_Write(g_AppData.SendBuff);
-		CLI_Write("\n\r");
-
 		break;
+
 	case MARKCOMPLETE:
-		//do something
+		//Build a GET request that marks a command complete
+		//In this case, data will contain an integer with completed task number
+		pal_Strcat(g_AppData.SendBuff, TASK_PRE_BUFFER);
+		pal_Strcat(g_AppData.SendBuff, DEVICE_ID);
+		pal_Strcat(g_AppData.SendBuff, TASK_POST_BUFFER);
+		//Append the task id
+		char taskChars[SMALL_BUF];
+		itoa(g_AppData.TaskID, taskChars);
+		pal_Strcat(g_AppData.SendBuff, taskChars);
+		pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
+		pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
 		break;
+
 	case SEND:
-		//do something
+		//Send the temperature data point.
 		break;
 
 	}
@@ -910,6 +920,7 @@ static _i32 initializeAppVariables()
 
     /*Austin - Set the device ID to its permanent value*/
 //    g_AppData.DeviceID = 9000;
+    g_AppData.TaskID = 7;
     return SUCCESS;
 }
 
