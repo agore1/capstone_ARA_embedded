@@ -67,7 +67,7 @@
 #define GET_BUFFER		"GET /getcommand/"
 #define TASK_PRE_BUFFER	"GET /completetask/device="
 #define TASK_POST_BUFFER	"&task="
-#define SEND_PRE_BUFFER 	"/sendtemp/device="
+#define SEND_PRE_BUFFER 	"GET /sendtemp/device="
 #define SEND_POST_BUFFER	"&temp="
 
 #define SMALL_BUF           32
@@ -91,6 +91,8 @@ typedef enum{
 	SEND
 } tx_enum;
 
+//Enum with 
+
 /*
  * GLOBAL VARIABLES -- Start
  */
@@ -108,6 +110,8 @@ struct{
     _u8 DeviceID[SMALL_BUF];
     //The command to be executed
     _i16 TaskID;
+    //Most recente temperature reading
+    _i16 RecentTemp;
 }g_AppData;
 /*
  * GLOBAL VARIABLES -- End
@@ -448,7 +452,7 @@ static _i32 getData()
     _i32 retVal = -1;
 
     //first make our buffer just to test
-    sendMessage(MARKCOMPLETE, "H");
+    sendMessage(GETCMD, "H");
 
 
     pal_Memset(g_AppData.Recvbuff, 0, sizeof(g_AppData.Recvbuff));
@@ -491,6 +495,7 @@ static _i32 getData()
     CLI_Write(g_AppData.Recvbuff);
     CLI_Write("\n\r");
 
+    /*Parse the Received Data*/
     /*Get ticker name*/
     p_startPtr = (_u8 *)pal_Strstr(g_AppData.Recvbuff, "name=");
     if( NULL != p_startPtr )
@@ -600,11 +605,23 @@ static _i32 sendMessage(tx_enum type, char* data){
 		itoa(g_AppData.TaskID, taskChars);
 		pal_Strcat(g_AppData.SendBuff, taskChars);
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
-		pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
-		break;
+        pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
+        break;
 
-	case SEND:
-		//Send the temperature data point.
+    case SEND:
+        //Send the temperature data point. Temp is an int. 
+        pal_Strcat(g_AppData.SendBuff, SEND_PRE_BUFFER);
+        pal_Strcat(g_AppData.SendBuff, DEVICE_ID);
+        pal_Strcat(g_AppData.SendBuff, SEND_POST_BUFFER);
+        //Convert temperature to a char and send. 
+        char tempChars[SMALL_BUF];
+        itoa(g_AppData.RecentTemp, tempChars);
+        pal_Strcat(g_AppData.SendBuff, tempChars);
+        pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
+		pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
+
+
+
 		break;
 
 	}
@@ -921,6 +938,7 @@ static _i32 initializeAppVariables()
     /*Austin - Set the device ID to its permanent value*/
 //    g_AppData.DeviceID = 9000;
     g_AppData.TaskID = 7;
+    g_AppData.RecentTemp = 55;
     return SUCCESS;
 }
 
