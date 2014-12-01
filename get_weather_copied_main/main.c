@@ -49,6 +49,7 @@
 #include "simplelink.h"
 #include "sl_common.h"
 #include "convenienceFunctions.h"
+#include "andrew_tempsense.h"
 
 #define APPLICATION_VERSION "1.1.0"
 
@@ -73,6 +74,17 @@
 #define SMALL_BUF           32
 #define MAX_SEND_BUF_SIZE   512
 #define MAX_SEND_RCV_SIZE   1024
+
+/*Andrew's IR Defines */
+#define REDLED		BIT0  // port 1 bit 0
+#define GREENLED	BIT7  // port 4 bit 7
+#define BUTTON 		BIT1  // port 2 bit 1
+#define FREQ		25    // freq in MHz
+#define PERIOD		320
+
+#define IRLEDPORT	P3OUT
+#define IRLEDDIR  	P3DIR
+#define IRLED		BIT7  // port 3 bit 7 --> may need to change
 
 /* Application specific status/error codes */
 typedef enum{
@@ -113,6 +125,8 @@ struct{
     //Most recente temperature reading
     _i16 RecentTemp;
 }g_AppData;
+
+volatile int flag = 0;
 /*
  * GLOBAL VARIABLES -- End
  */
@@ -138,6 +152,12 @@ static _i32 sendMessage(tx_enum type, char* data);
  * STATIC FUNCTION DEFINITIONS -- End
  */
 
+void port_setup(void);
+//void clock_setup(void);
+void timer_setup(void);
+void IRdelay(int delay);
+
+void ir_transmit(long int code[], int size);
 
 /*
  * ASYNCHRONOUS EVENT HANDLERS -- Start
@@ -351,12 +371,17 @@ int main(int argc, char** argv)
 
     /* Stop WDT and initialize the system-clock of the MCU */
     stopWDT();
+//    port_setup();
+//    timer_setup();
     initClk();
+    ADCinit();
+    _BIS_SR(GIE);	//Globally enable interrupts
+    while(1){
+    	sample();
+    	convert();
+    	_nop();
+    }
 
-    /*Debugging*/
-//    P8OUT &= ~BIT1;
-//    P8DIR |= BIT1;
-//    P8OUT |= BIT1;
 
     /* Configure command line interface */
     CLI_Configure();
@@ -956,3 +981,84 @@ static void displayBanner()
     CLI_Write(APPLICATION_VERSION);
     CLI_Write("\n\r*******************************************************************************\n\r");
 }
+
+
+/*Andrew's code for IR Transmission */
+void port_setup(void) {
+
+	// Set up the Various LED's
+	P1OUT &= ~REDLED;
+	P4OUT &= ~GREENLED;
+	IRLEDPORT &= ~IRLED;
+	P1DIR |= REDLED;
+	P4DIR |= GREENLED;
+	IRLEDDIR |= IRLED;
+
+	//set up the button
+	P2REN |= BUTTON;
+}
+
+void timer_setup(void){
+	TA0CCTL0 = CCIE | CM_0;		// enable capture
+	TA0CCR0 = PERIOD;			// set the period
+	TA0CTL = TASSEL_2 | ID_0 | TACLR | MC_1;  // source from SMLK, divide by 1, clear when hit limit, count up to CCR0
+}
+
+void ir_transmit(long int code[], int size) {
+	volatile int i;
+	flag = 0;
+	for (i = 0; i < size; i++) {
+		flag = 1-flag;  // flag toggle
+		volatile long int delay = code[i];
+
+		if (i > 65) {
+			_nop();
+		}
+
+		if (delay > 30000) {
+			_delay_cycles(37000*FREQ);
+		}
+
+		else if (flag == 1) {
+			IRLEDPORT |= IRLED;
+			_nop();
+			IRdelay(delay);
+		}
+
+		else if (flag == 0){
+			IRLEDPORT &= ~IRLED;
+			_nop();
+			IRdelay(delay);
+		}
+
+
+
+	}
+
+	// turn off LED, stop transmission
+	flag = 0;
+	IRLEDPORT &= ~IRLED;
+}
+
+// delays for the IR transmit
+// the int should be in micorseconds
+void IRdelay(int delay) {
+	// This will overshoot
+	volatile int i = 0;
+	for (i = 0; i < delay; i++){
+		// assumes a 16 MHZ freq
+		// subtract 7 to make up for incr, comparison, and function calls
+		_delay_cycles(FREQ - 11);
+	}
+}
+
+/*
+#pragma vector=TIMER0_A0_VECTOR
+__interrupt void Timer_A(void) {	// when interrupt from A0 trips
+
+	TA0CCTL0 &= ~CCIFG;		     // clear the flag
+	if (flag==1) {
+	    IRLEDPORT ^= IRLED;		// toggle the green led
+	}
+}
+*/

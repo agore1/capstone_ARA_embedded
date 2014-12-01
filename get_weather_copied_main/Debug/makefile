@@ -8,6 +8,7 @@ CG_TOOL_ROOT := c:/ti/ccsv6/tools/compiler/msp430_4.3.5
 
 ORDERED_OBJS += \
 $(GEN_CMDS__FLAG) \
+"./andrew_tempsense.obj" \
 "./convenienceFunctions.obj" \
 "./main.obj" \
 "./uart/uart.obj" \
@@ -165,8 +166,8 @@ get_weather_copied_main.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "convenienceFunctions.pp" "main.pp" "uart\uart.pp" "spi\spi.pp" "simplelink\source\device.pp" "simplelink\source\driver.pp" "simplelink\source\flowcont.pp" "simplelink\source\fs.pp" "simplelink\source\netapp.pp" "simplelink\source\netcfg.pp" "simplelink\source\nonos.pp" "simplelink\source\socket.pp" "simplelink\source\spawn.pp" "simplelink\source\wlan.pp" "cli_uart\cli_uart.pp" "board\board.pp" 
-	-$(RM) "convenienceFunctions.obj" "main.obj" "uart\uart.obj" "spi\spi.obj" "simplelink\source\device.obj" "simplelink\source\driver.obj" "simplelink\source\flowcont.obj" "simplelink\source\fs.obj" "simplelink\source\netapp.obj" "simplelink\source\netcfg.obj" "simplelink\source\nonos.obj" "simplelink\source\socket.obj" "simplelink\source\spawn.obj" "simplelink\source\wlan.obj" "cli_uart\cli_uart.obj" "board\board.obj" 
+	-$(RM) "andrew_tempsense.pp" "convenienceFunctions.pp" "main.pp" "uart\uart.pp" "spi\spi.pp" "simplelink\source\device.pp" "simplelink\source\driver.pp" "simplelink\source\flowcont.pp" "simplelink\source\fs.pp" "simplelink\source\netapp.pp" "simplelink\source\netcfg.pp" "simplelink\source\nonos.pp" "simplelink\source\socket.pp" "simplelink\source\spawn.pp" "simplelink\source\wlan.pp" "cli_uart\cli_uart.pp" "board\board.pp" 
+	-$(RM) "andrew_tempsense.obj" "convenienceFunctions.obj" "main.obj" "uart\uart.obj" "spi\spi.obj" "simplelink\source\device.obj" "simplelink\source\driver.obj" "simplelink\source\flowcont.obj" "simplelink\source\fs.obj" "simplelink\source\netapp.obj" "simplelink\source\netcfg.obj" "simplelink\source\nonos.obj" "simplelink\source\socket.obj" "simplelink\source\spawn.obj" "simplelink\source\wlan.obj" "cli_uart\cli_uart.obj" "board\board.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 
