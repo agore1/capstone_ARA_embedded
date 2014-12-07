@@ -50,6 +50,8 @@
 #include "sl_common.h"
 #include "convenienceFunctions.h"
 #include "andrew_tempsense.h"
+#include "data.h"
+#include "Decode.h"
 
 #define APPLICATION_VERSION "1.1.0"
 
@@ -109,6 +111,8 @@ typedef enum{
  * GLOBAL VARIABLES -- Start
  */
 _u32  g_Status = 0;
+//Task struct which holds task ID and array of Longs.
+IRCode currentTask;
 struct{
     _u8 Recvbuff[MAX_SEND_RCV_SIZE];
     _u8 SendBuff[MAX_SEND_BUF_SIZE];
@@ -124,6 +128,7 @@ struct{
     _i16 TaskID;
     //Most recente temperature reading
     _i16 RecentTemp;
+
 }g_AppData;
 
 volatile int flag = 0;
@@ -148,6 +153,7 @@ static _i32 createConnection();
 static _i32 getData();
 
 static _i32 sendMessage(tx_enum type, char* data);
+static _i32 parseMessage(tx_enum type);
 /*
  * STATIC FUNCTION DEFINITIONS -- End
  */
@@ -371,17 +377,19 @@ int main(int argc, char** argv)
 
     /* Stop WDT and initialize the system-clock of the MCU */
     stopWDT();
-//    port_setup();
-//    timer_setup();
     initClk();
+    port_setup();
+    timer_setup();
     ADCinit();
     _BIS_SR(GIE);	//Globally enable interrupts
-    while(1){
-    	sample();
-    	convert();
-    	_nop();
-    }
+//    while(1){
+//    	sample();
+//    	convert();
+//    	_nop();
+//    }
 
+//    ir_transmit(bluetooth_power_toggle,71);
+    _delay_cycles(1000);
 
     /* Configure command line interface */
     CLI_Configure();
@@ -479,29 +487,12 @@ static _i32 getData()
     //first make our buffer just to test
     sendMessage(GETCMD, "H");
 
-
     pal_Memset(g_AppData.Recvbuff, 0, sizeof(g_AppData.Recvbuff));
 
-
-    /* Puts together the HTTP GET string. */
-//    p_bufLocation = g_AppData.SendBuff;
-//    pal_Strcpy(p_bufLocation, PREFIX_BUFFER);
-//
-//    p_bufLocation += pal_Strlen(PREFIX_BUFFER);
-////    pal_Strcpy(p_bufLocation, g_AppData.CityName);
-//
-////    p_bufLocation += pal_Strlen(g_AppData.CityName);
-//    pal_Strcpy(p_bufLocation, POST_BUFFER);
-//
-//    p_bufLocation += pal_Strlen(POST_BUFFER);
-//    pal_Strcpy(p_bufLocation, POST_BUFFER2);
-//
-//    /* Debugging */
-    CLI_Write("Send buffer is: ");
+    /* Debugging */
+    CLI_Write("Send buffer is: \n\r");
     CLI_Write(g_AppData.SendBuff);
 //    CLI_Write("\n\r");
-
-
 
     /* Send the HTTP GET string to the open TCP/IP socket. */
     retVal = sl_Send(g_AppData.SockID, g_AppData.SendBuff, pal_Strlen(g_AppData.SendBuff), 0);
@@ -520,84 +511,13 @@ static _i32 getData()
     CLI_Write(g_AppData.Recvbuff);
     CLI_Write("\n\r");
 
+    parseMessage(GETCMD);
+
     /*Parse the Received Data*/
-    /*Get ticker name*/
-    p_startPtr = (_u8 *)pal_Strstr(g_AppData.Recvbuff, "name=");
-    if( NULL != p_startPtr )
-    {
-        p_startPtr = p_startPtr + pal_Strlen("name=") + 1;
-        p_endPtr = (_u8 *)pal_Strstr(p_startPtr, "\">");
-        if( NULL != p_endPtr )
-        {
-            *p_endPtr = 0;
-        }
-    }
+//    ir_transmit(bluetooth_power_toggle,71);
+    ir_transmit(currentTask.pulses, currentTask.size);
 
-    CLI_Write((_u8 *)"\n ************************ \n\r\n\r");
-    CLI_Write((_u8 *)" City: ");
-    if(p_startPtr == NULL)
-    {
-        CLI_Write((_u8 *)"N/A\n\r\n\r");
-    }
-    else
-    {
-        CLI_Write((_u8 *)p_startPtr);
-        CLI_Write((_u8 *)"\n\r\n\r");
-    }
-
-    if(p_endPtr == NULL)
-    {
-        CLI_Write((_u8 *)" Error during parsing the data.\r\n");
-        ASSERT_ON_ERROR(HTTP_INVALID_RESPONSE);
-    }
-
-    /* Get Temperature Value */
-    p_startPtr = (_u8 *)pal_Strstr(p_endPtr+1, "temperature value");
-    if( NULL != p_startPtr )
-    {
-        p_startPtr = p_startPtr + pal_Strlen("temperature value") + 2;
-        p_endPtr = (_u8 *)pal_Strstr(p_startPtr, "\" ");
-        if( NULL != p_endPtr )
-        {
-            *p_endPtr = 0;
-        }
-    }
-
-    CLI_Write((_u8 *)" Temperature: ");
-    if(p_startPtr == NULL)
-    {
-        CLI_Write((_u8 *)"N/A\n\r\n\r");
-    }
-    else
-    {
-        CLI_Write((_u8 *)p_startPtr);
-        CLI_Write((_u8 *)" F\n\r\n\r");
-    }
-
-    /* Get weather */
-    p_startPtr = (_u8 *)pal_Strstr(p_endPtr+1, "weather number");
-    if( NULL != p_startPtr )
-    {
-        p_startPtr = p_startPtr + pal_Strlen("weather number") + 14;
-        p_endPtr = (_u8 *)pal_Strstr((char *)p_startPtr, "\" ");
-        if( NULL != p_endPtr )
-        {
-            *p_endPtr = 0;
-        }
-    }
-
-    CLI_Write((_u8 *)" Weather Condition: ");
-    if(p_startPtr == NULL)
-    {
-        CLI_Write((_u8 *)"N/A\n\r\n\r");
-    }
-    else
-    {
-        CLI_Write((_u8 *)p_startPtr);
-        CLI_Write((_u8 *)"\n\r\n\r");
-    }
-
-    CLI_Write((_u8 *)"\n ************************ \n\r\n\r");
+    CLI_Write("Just tried to execute the command. \n\r");
 
     return SUCCESS;
 }
@@ -627,7 +547,7 @@ static _i32 sendMessage(tx_enum type, char* data){
 		pal_Strcat(g_AppData.SendBuff, TASK_POST_BUFFER);
 		//Append the task id
 		char taskChars[SMALL_BUF];
-		itoa(g_AppData.TaskID, taskChars);
+		itoa(currentTask.id, taskChars);
 		pal_Strcat(g_AppData.SendBuff, taskChars);
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
         pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
@@ -650,6 +570,40 @@ static _i32 sendMessage(tx_enum type, char* data){
 		break;
 
 	}
+}
+
+/* Adaptable Parsing Message */
+static _i32 parseMessage(tx_enum type){
+	  volatile char *p_messageStart = NULL;
+	  _i32 returnVal = 0;
+	switch(type){
+	case GETCMD:{
+		//Find beginning of message
+		p_messageStart = pal_Strstr(g_AppData.Recvbuff, "start code:");
+		if( NULL != p_messageStart ){
+		    _nop();
+		    volatile int len =  pal_Strlen("start code:");
+			p_messageStart += len;
+		    //Parse the code into the IRCode Struct
+		    parseCode(&currentTask, (char*) p_messageStart);
+		}
+		else{
+			CLI_Write("No IRCode detected");
+		}
+		returnVal = 1;
+		break;
+	}
+	case MARKCOMPLETE:{
+		break;
+	}
+	case SEND:{
+		break;
+	}
+	default: {
+		break;
+	}
+	}
+	return returnVal;
 }
 
 
@@ -1052,7 +1006,7 @@ void IRdelay(int delay) {
 	}
 }
 
-/*
+
 #pragma vector=TIMER0_A0_VECTOR
 __interrupt void Timer_A(void) {	// when interrupt from A0 trips
 
@@ -1061,4 +1015,4 @@ __interrupt void Timer_A(void) {	// when interrupt from A0 trips
 	    IRLEDPORT ^= IRLED;		// toggle the green led
 	}
 }
-*/
+

@@ -27,6 +27,8 @@ main.obj: C:/ti/CC3100SDK_1.0.0/cc3100-sdk/simplelink/include/wlan_rx_filters.h
 main.obj: C:/ti/CC3100SDK_1.0.0/cc3100-sdk/examples/common/sl_common.h
 main.obj: ../convenienceFunctions.h
 main.obj: ../andrew_tempsense.h
+main.obj: ../data.h
+main.obj: ../Decode.h
 
 ../main.c: 
 C:/ti/CC3100SDK_1.0.0/cc3100-sdk/simplelink/include/simplelink.h: 
@@ -55,3 +57,5 @@ C:/ti/CC3100SDK_1.0.0/cc3100-sdk/simplelink/include/wlan_rx_filters.h:
 C:/ti/CC3100SDK_1.0.0/cc3100-sdk/examples/common/sl_common.h: 
 ../convenienceFunctions.h: 
 ../andrew_tempsense.h: 
+../data.h: 
+../Decode.h: 
