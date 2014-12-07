@@ -105,7 +105,37 @@ typedef enum{
 	SEND
 } tx_enum;
 
-//Enum with 
+//enum with state machine states
+typedef enum{
+	INITIALIZE,
+	RECVCMD,
+	EXECCMD,
+	SENDRESULT,
+	READTEMP,
+	SENDTEMP
+} machine_states;
+
+//Return codes for state machine operations.
+typedef enum{
+	INITCOMPLETE,
+	NOCMD,
+	RXFAIL,
+	RXOK,
+	EXECFAIL,
+	EXECOK,
+	TXOK,
+	TXFAIL,
+	READFAIL,
+	READOK,
+	ERRORSTATE
+}stateMachineReturns;
+
+//struct containing application data
+typedef struct {
+	machine_states state;
+	stateMachineReturns returns;
+}machineStatesReturns;
+
 
 /*
  * GLOBAL VARIABLES -- Start
@@ -131,6 +161,8 @@ struct{
 
 }g_AppData;
 
+machineStatesReturns thisMachine;
+
 volatile int flag = 0;
 /*
  * GLOBAL VARIABLES -- End
@@ -154,10 +186,12 @@ static _i32 getData();
 
 static _i32 sendMessage(tx_enum type, char* data);
 static _i32 parseMessage(tx_enum type);
+
+static _i32 config3100();
 /*
  * STATIC FUNCTION DEFINITIONS -- End
  */
-
+void manageStates(machine_states* state, stateMachineReturns* status);
 void port_setup(void);
 //void clock_setup(void);
 void timer_setup(void);
@@ -372,6 +406,7 @@ int main(int argc, char** argv)
 {
     _i32 retVal = -1;
 
+    /*Initialize App variables, including the state machine*/
     retVal = initializeAppVariables();
     ASSERT_ON_ERROR(retVal);
 
@@ -393,9 +428,38 @@ int main(int argc, char** argv)
 
     /* Configure command line interface */
     CLI_Configure();
-
     displayBanner();
 
+    /*Underlying initialization has been completed, start using the state machine*/
+    while(1){
+    	manageStates(&thisMachine.state, &thisMachine.returns);
+    }
+
+
+
+
+
+    retVal = getWeather();
+
+    if(retVal < 0)
+    {
+        CLI_Write(" Failed to get weather information \n\r");
+        LOOP_FOREVER();
+    }
+
+    retVal = disconnectFromAP();
+    if(retVal < 0)
+    {
+        CLI_Write(" Failed to disconnect from AP \n\r");
+        LOOP_FOREVER();
+    }
+
+    return 0;
+}
+
+static _i32 config3100(){
+	thisMachine.returns = ERRORSTATE;
+    _i32 retVal = -1;
     /*
      * Following function configures the device to default state by cleaning
      * the persistent settings stored in NVMEM (viz. connection profiles &
@@ -412,8 +476,9 @@ int main(int argc, char** argv)
     {
         if (DEVICE_NOT_IN_STATION_MODE == retVal)
             CLI_Write(" Failed to configure the device in its default state \n\r");
-
-        LOOP_FOREVER();
+        /*This should now be handled by the ERRORSTATE variable*/
+//        LOOP_FOREVER();
+        return;
     }
 
     CLI_Write(" Device is configured in default state \n\r");
@@ -426,44 +491,30 @@ int main(int argc, char** argv)
     if ((retVal < 0) ||
         (ROLE_STA != retVal) )
     {
-        CLI_Write(" Failed to start the device \n\r");
-        LOOP_FOREVER();
+    	CLI_Write(" Failed to start the device \n\r");
+        /*This should now be handled by the ERRORSTATE variable*/
+//        LOOP_FOREVER();
+    	return;
     }
 
     CLI_Write(" Device started as STATION \n\r");
 
-    /* Get the mac address*/
-//    CLI_Write("Attempting to get the MAC address now");
-//    unsigned char macAddressVal[SL_MAC_ADDR_LEN];
-//    unsigned char macAddressLen = SL_MAC_ADDR_LEN;
-//    sl_NetCfgGet(SL_MAC_ADDRESS_GET,NULL,&macAddressLen,(unsigned char *)macAddressVal);
 
     /* Connecting to WLAN AP */
     retVal = establishConnectionWithAP();
     if(retVal < 0)
     {
         CLI_Write(" Failed to establish connection w/ an AP \n\r");
-        LOOP_FOREVER();
+        /*This should now be handled by the ERRORSTATE variable*/
+//        LOOP_FOREVER();
+        return;
     }
 
     CLI_Write(" Connection established w/ AP and IP is acquired \n\r");
-//    P8OUT ^= BIT1;
-    retVal = getWeather();
-//    P8OUT ^= BIT1;
-    if(retVal < 0)
-    {
-        CLI_Write(" Failed to get weather information \n\r");
-        LOOP_FOREVER();
-    }
 
-    retVal = disconnectFromAP();
-    if(retVal < 0)
-    {
-        CLI_Write(" Failed to disconnect from AP \n\r");
-        LOOP_FOREVER();
-    }
-
-    return 0;
+    /*Indicate that we've completed the setup*/
+    thisMachine.returns = INITCOMPLETE;
+    return;
 }
 
 /*!
@@ -857,9 +908,9 @@ static _i32 establishConnectionWithAP()
 {
     SlSecParams_t secParams = {0};
     _i32 retVal = 0;
-
-    secParams.Key = PASSKEY;
-    secParams.KeyLen = PASSKEY_LEN;
+    //Austin Debugging here
+//    secParams.Key = PASSKEY;
+//    secParams.KeyLen = PASSKEY_LEN;
     secParams.Type = SEC_TYPE;
 
     retVal = sl_WlanConnect(SSID_NAME, pal_Strlen(SSID_NAME), 0, &secParams, 0);
@@ -918,6 +969,10 @@ static _i32 initializeAppVariables()
 //    g_AppData.DeviceID = 9000;
     g_AppData.TaskID = 7;
     g_AppData.RecentTemp = 55;
+
+    thisMachine.returns = ERRORSTATE;
+    thisMachine.state = INITIALIZE;
+
     return SUCCESS;
 }
 
@@ -931,7 +986,7 @@ static _i32 initializeAppVariables()
 static void displayBanner()
 {
     CLI_Write("\n\r\n\r");
-    CLI_Write(" Get weather application - Version ");
+    CLI_Write(" AWESOME BLUETOOTH application - Version ");
     CLI_Write(APPLICATION_VERSION);
     CLI_Write("\n\r*******************************************************************************\n\r");
 }
@@ -1013,6 +1068,136 @@ __interrupt void Timer_A(void) {	// when interrupt from A0 trips
 	TA0CCTL0 &= ~CCIFG;		     // clear the flag
 	if (flag==1) {
 	    IRLEDPORT ^= IRLED;		// toggle the green led
+	}
+}
+
+void manageStates(machine_states* state, stateMachineReturns* status){
+	switch(*state){
+		//Before manageStates is ever called, all the initialization functions should have been called
+		case INITIALIZE:{
+			/*Configure the CC3100 for WIFI connectivity*/
+			config3100();
+			switch(*status){
+				case INITCOMPLETE:{
+					//Change state to receive command
+					//Nothing else to do here, setup for recieving command should have already been completed.
+					*state = RECVCMD;
+					break;
+				}
+				default:{
+					*status = ERRORSTATE;
+					break;
+				}
+			}
+			break;
+		}
+		case RECVCMD:{
+			//First attempt the network communication.
+			//sendMessage must update status variable upon success.
+//			sendMessage(GETCMD, "H");
+//			recvMessage(GETCMD);
+//			parseMessage(GETCMD);
+			_nop();
+			switch(*status){
+				case RXOK:{
+					*state = EXECCMD;
+					break;
+				}
+				case RXFAIL:{
+					*status = ERRORSTATE;
+					break;
+				}
+			}
+			break;
+		}
+		case EXECCMD:{
+			//Attempt to broadcast the command. ir_transmit must set status variable upon success.
+//			ir_transmit();
+			switch(*status){
+				case EXECOK:{
+					*state = SENDRESULT;
+					break;
+				}
+				case EXECFAIL:{
+					*status = ERRORSTATE;
+					break;
+				}
+				default:{
+					*status = ERRORSTATE;
+					break;
+				}
+			}
+			break;
+		}
+		case SENDRESULT:{
+			//Attempt to report completion of command
+			//sendMessage must update status variable upon success.
+//			sendMessage(MARKCOMPLETE, "H");
+//			recvMessage(MARKCOMPLETE);
+//			parseMessage(MARKCOMPLETE);
+			switch(*status){
+				case TXOK:{
+					*state = READTEMP;
+					break;
+				}
+				case RXFAIL:{
+					*status = ERRORSTATE;
+					break;
+				}
+				default:{
+					*status = ERRORSTATE;
+					break;
+				}
+			}
+			break;
+		}
+		case READTEMP:{
+			/*Attempt to read temperature. This could actually do the conversion
+			 or just read the most recently converted value */
+			/*readTemperature must set the status variable appropriately*/
+//			readTemperature();
+			switch(*status){
+				case READOK:{
+					*state = SENDTEMP;
+					break;
+				}
+				case READFAIL:{
+					*status = ERRORSTATE;
+					break;
+				}
+				default:{
+					*status = ERRORSTATE;
+					break;
+				}
+			}
+			break;
+		}
+		case SENDTEMP:{
+			//Attempt to send the most recent temperature.
+			//sendMessage or parseMessage must update status variable upon success.
+//			sendMessage(SEND, "H");
+//			recvMessage(SEND);
+//			parseMessage(SEND);
+			switch(*status){
+				case TXOK:{
+					*state = RECVCMD;
+					break;
+				}
+				case TXFAIL:{
+					*status = ERRORSTATE;
+					break;
+				}
+				default:{
+					*status = ERRORSTATE;
+					break;
+				}
+			}
+			break;
+		}
+		default:{
+			*state = INITIALIZE;
+			break;
+		}
 	}
 }
 
