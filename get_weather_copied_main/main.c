@@ -48,7 +48,7 @@
 
 #include "simplelink.h"
 #include "sl_common.h"
-#include "convenienceFunctions.h"
+//#include "convenienceFunctions.h"
 #include "andrew_tempsense.h"
 #include "Decode.h"
 
@@ -219,53 +219,53 @@ void ir_transmit(long int code[], int size);
 void SimpleLinkWlanEventHandler(SlWlanEvent_t *pWlanEvent)
 {
 	if(pWlanEvent == NULL)
-		CLI_Write(" [WLAN EVENT] NULL Pointer Error \n\r");
+		//CLI_Write(" [WLAN EVENT] NULL Pointer Error \n\r");
 
-	switch(pWlanEvent->Event)
-	{
-	case SL_WLAN_CONNECT_EVENT:
-	{
-		SET_STATUS_BIT(g_Status, STATUS_BIT_CONNECTION);
-
-		/*
-		 * Information about the connected AP (like name, MAC etc) will be
-		 * available in 'slWlanConnectAsyncResponse_t' - Applications
-		 * can use it if required
-		 *
-		 * slWlanConnectAsyncResponse_t *pEventData = NULL;
-		 * pEventData = &pWlanEvent->EventData.STAandP2PModeWlanConnected;
-		 *
-		 */
-	}
-	break;
-
-	case SL_WLAN_DISCONNECT_EVENT:
-	{
-		slWlanConnectAsyncResponse_t*  pEventData = NULL;
-
-		CLR_STATUS_BIT(g_Status, STATUS_BIT_CONNECTION);
-		CLR_STATUS_BIT(g_Status, STATUS_BIT_IP_ACQUIRED);
-
-		pEventData = &pWlanEvent->EventData.STAandP2PModeDisconnected;
-
-		/* If the user has initiated 'Disconnect' request, 'reason_code' is SL_USER_INITIATED_DISCONNECTION */
-		if(SL_USER_INITIATED_DISCONNECTION == pEventData->reason_code)
+		switch(pWlanEvent->Event)
 		{
-			CLI_Write(" Device disconnected from the AP on application's request \n\r");
-		}
-		else
+		case SL_WLAN_CONNECT_EVENT:
 		{
-			CLI_Write(" Device disconnected from the AP on an ERROR..!! \n\r");
-		}
-	}
-	break;
+			SET_STATUS_BIT(g_Status, STATUS_BIT_CONNECTION);
 
-	default:
-	{
-		CLI_Write(" [WLAN EVENT] Unexpected event \n\r");
-	}
-	break;
-	}
+			/*
+			 * Information about the connected AP (like name, MAC etc) will be
+			 * available in 'slWlanConnectAsyncResponse_t' - Applications
+			 * can use it if required
+			 *
+			 * slWlanConnectAsyncResponse_t *pEventData = NULL;
+			 * pEventData = &pWlanEvent->EventData.STAandP2PModeWlanConnected;
+			 *
+			 */
+		}
+		break;
+
+		case SL_WLAN_DISCONNECT_EVENT:
+		{
+			slWlanConnectAsyncResponse_t*  pEventData = NULL;
+
+			CLR_STATUS_BIT(g_Status, STATUS_BIT_CONNECTION);
+			CLR_STATUS_BIT(g_Status, STATUS_BIT_IP_ACQUIRED);
+
+			pEventData = &pWlanEvent->EventData.STAandP2PModeDisconnected;
+
+			/* If the user has initiated 'Disconnect' request, 'reason_code' is SL_USER_INITIATED_DISCONNECTION */
+			if(SL_USER_INITIATED_DISCONNECTION == pEventData->reason_code)
+			{
+				CLI_Write(" Device disconnected from the AP on application's request \n\r");
+			}
+			else
+			{
+				CLI_Write(" Device disconnected from the AP on an ERROR..!! \n\r");
+			}
+		}
+		break;
+
+		default:
+		{
+			CLI_Write(" [WLAN EVENT] Unexpected event \n\r");
+		}
+		break;
+		}
 }
 
 /*!
@@ -282,8 +282,8 @@ void SimpleLinkWlanEventHandler(SlWlanEvent_t *pWlanEvent)
  */
 void SimpleLinkNetAppEventHandler(SlNetAppEvent_t *pNetAppEvent)
 {
-	if(pNetAppEvent == NULL)
-		CLI_Write(" [NETAPP EVENT] NULL Pointer Error \n\r");
+	//	if(pNetAppEvent == NULL)
+	//		CLI_Write(" [NETAPP EVENT] NULL Pointer Error \n\r");
 
 	switch(pNetAppEvent->Event)
 	{
@@ -443,11 +443,11 @@ int main(int argc, char** argv)
 
 	//	retVal = getWeather();
 
-	if(retVal < 0)
-	{
-		CLI_Write(" Failed to get weather information \n\r");
-		LOOP_FOREVER();
-	}
+	//	if(retVal < 0)
+	//	{
+	//	CLI_Write(" Failed to get weather information \n\r");
+	//		LOOP_FOREVER();
+	//	}
 
 
 
@@ -471,10 +471,11 @@ static _i32 config3100(){
 	retVal = configureSimpleLinkToDefaultState();
 	if(retVal < 0)
 	{
-		if (DEVICE_NOT_IN_STATION_MODE == retVal)
+		if (DEVICE_NOT_IN_STATION_MODE == retVal){
 			CLI_Write(" Failed to configure the device in its default state \n\r");
+		}
 		/*This should now be handled by the ERRORSTATE variable*/
-		//        LOOP_FOREVER();
+		LOOP_FOREVER();
 		return;
 	}
 
@@ -490,7 +491,7 @@ static _i32 config3100(){
 	{
 		CLI_Write(" Failed to start the device \n\r");
 		/*This should now be handled by the ERRORSTATE variable*/
-		//        LOOP_FOREVER();
+		LOOP_FOREVER();
 		return;
 	}
 
@@ -503,11 +504,27 @@ static _i32 config3100(){
 	{
 		CLI_Write(" Failed to establish connection w/ an AP \n\r");
 		/*This should now be handled by the ERRORSTATE variable*/
-		//        LOOP_FOREVER();
+		LOOP_FOREVER();
 		return;
 	}
 
 	CLI_Write(" Connection established w/ AP and IP is acquired \n\r");
+
+
+	/*Set up the socket to send to*/
+	pal_Strcpy((char *)g_AppData.HostName, WEATHER_SERVER);
+
+	retVal = getHostIP();
+	if(retVal < 0)
+	{
+		CLI_Write((_u8 *)" Unable to reach Host\n\r\n\r");
+		thisMachine.returns = RETURNERROR;
+		ASSERT_ON_ERROR(retVal);
+	}
+
+	g_AppData.SockID = createConnection();
+	ASSERT_ON_ERROR(g_AppData.SockID);
+	//		 */
 
 	/*Indicate that we've completed the setup*/
 	thisMachine.returns = INITCOMPLETE;
@@ -533,7 +550,8 @@ static _i32 sendMessage(tx_enum type){
 	//All methods use g_AppData.SendBuff, clear it first
 	pal_Memset(g_AppData.SendBuff, 0, sizeof(g_AppData.SendBuff));
 
-	/*Set up the socket to send to*/
+
+	/*Set up the socket to send to
 	pal_Strcpy((char *)g_AppData.HostName, WEATHER_SERVER);
 
 	retVal = getHostIP();
@@ -546,7 +564,7 @@ static _i32 sendMessage(tx_enum type){
 
 	g_AppData.SockID = createConnection();
 	ASSERT_ON_ERROR(g_AppData.SockID);
-
+	 */
 	//switch on which type: GETCMD, MARKCOMPLETE or SEND
 	switch(type){
 	case GETCMD:
@@ -567,7 +585,7 @@ static _i32 sendMessage(tx_enum type){
 		pal_Strcat(g_AppData.SendBuff, TASK_POST_BUFFER);
 		//Append the task id
 		char taskChars[SMALL_BUF];
-		itoa(currentTask.id, taskChars);
+		//		itoa(currentTask.id, taskChars);
 		pal_Strcat(g_AppData.SendBuff, taskChars);
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
@@ -581,7 +599,7 @@ static _i32 sendMessage(tx_enum type){
 		//Convert temperature to a char and send.
 		char tempChars[SMALL_BUF];
 		//TODO: Check that this casting is sound...
-		itoa(g_AppData.RecentTemp, tempChars);
+		//		itoa(g_AppData.RecentTemp, tempChars);
 		pal_Strcat(g_AppData.SendBuff, tempChars);
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER);
 		pal_Strcat(g_AppData.SendBuff, POST_BUFFER2);
@@ -613,11 +631,7 @@ static _i32 recvMessage(){
 		//		ASSERT_ON_ERROR(HTTP_RECV_ERROR);
 		thisMachine.returns = RXFAIL;
 	}
-	/*Close this particular socket*/
-	retVal = sl_Close(g_AppData.SockID);
-	if(retVal < 0){
-		thisMachine.returns = RXFAIL;
-	}
+
 	ASSERT_ON_ERROR(retVal);
 	g_AppData.Recvbuff[pal_Strlen(g_AppData.Recvbuff)] = '\0';
 
@@ -892,8 +906,8 @@ static _i32 establishConnectionWithAP()
 	SlSecParams_t secParams = {0};
 	_i32 retVal = 0;
 	//Austin Debugging here
-	//    secParams.Key = PASSKEY;
-	//    secParams.KeyLen = PASSKEY_LEN;
+	secParams.Key = PASSKEY;
+	secParams.KeyLen = PASSKEY_LEN;
 	secParams.Type = SEC_TYPE;
 
 	retVal = sl_WlanConnect(SSID_NAME, pal_Strlen(SSID_NAME), 0, &secParams, 0);
@@ -968,10 +982,11 @@ static _i32 initializeAppVariables()
  */
 static void displayBanner()
 {
-	CLI_Write("\n\r\n\r");
-	CLI_Write(" AWESOME BLUETOOTH application - Version ");
-	CLI_Write(APPLICATION_VERSION);
-	CLI_Write("\n\r*******************************************************************************\n\r");
+	//	CLI_Write("\n\r\n\r");
+	//	CLI_Write(" AWESOME BLUETOOTH application - Version ");
+	//	CLI_Write(APPLICATION_VERSION);
+	//	CLI_Write("\n\r*******************************************************************************\n\r");
+	_nop();
 }
 
 
@@ -1196,10 +1211,16 @@ void manageStates(machine_states* state, stateMachineReturns* status){
 	}
 	case ERRORSTATE:{
 		CLI_Write("We've encountered an error, stopping now.\n");
-		_i32 retVal = disconnectFromAP();
+		_i32 retVal;
+		/*Close this particular socket*/
+		retVal = sl_Close(g_AppData.SockID);
+		if(retVal < 0){
+			thisMachine.returns = RXFAIL;
+		}
+		retVal = disconnectFromAP();
 		if(retVal < 0)
 		{
-			CLI_Write(" Failed to disconnect from AP \n\r");
+			//CLI_Write(" Failed to disconnect from AP \n\r");
 			LOOP_FOREVER();
 		}
 		LOOP_FOREVER();
